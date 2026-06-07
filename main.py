@@ -7,6 +7,9 @@ from database import get_db
 from binance.async_client import AsyncClient
 from binance.exceptions import BinanceAPIException
 from sqlalchemy.future import select
+from fastapi import WebSocket
+import websockets 
+import json
 
 ## client = Client() ## Async needs this inside the functions its being used it
 
@@ -172,6 +175,26 @@ async def get_history(crypto:str, current_user:str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail = f"{crypto} is the wrong symbol, or the history isnt available")
     
     finally: await client.close_connection()  ## await Async connection close
+
+
+
+
+
+## Websocket Part of it, starts from here :
+@app.websocket("/ws/live/{crypto}")
+async def live(websocket: WebSocket, crypto:str ):
+
+    websocket_url = f"wss://stream.binance.com:9443/ws/{crypto}@trade"
+
+    await websocket.accept()
+    async with websockets.connect(websocket_url) as tunnel:
+        print("Tunnel opened, waiting for live trades: ")
+
+
+        async for message in tunnel: 
+            await websocket.send_text(message)
+  
+
 
 
 

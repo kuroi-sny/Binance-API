@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Live Crypto Stream</title>
+    </head>
+    <body>
+        <h1>Live Bitcoin Price</h1>
+        <h2 id="price" style="color: green;">Waiting for data...</h2>
+        
+        <script>
+            // 1. Connect to YOUR FastAPI server, NOT Binance directly
+            var ws = new WebSocket("ws://localhost:8000/ws/live/btcusdt");
+            
+            // 2. Every time your server broadcasts a message, update the screen
+            ws.onmessage = function(event) {
+                var data = JSON.parse(event.data);
+                document.getElementById('price').innerText = "$" + data.p;
+            };
+        </script>
+    </body>
+</html>
