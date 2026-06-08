@@ -1,13 +1,13 @@
 from sqlalchemy import Column, Integer, String, Float
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker,AsyncSession
 from sqlalchemy.orm import declarative_base
+import os
 
 ## URL to DB
-SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./trading_api.db"
-
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL") ## updated with docker-postgresql 
 
 ## 1) Engine
-engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True, connect_args={"check_same_thread": False})
+engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)
 
 ## Session local
 SessionLocal = async_sessionmaker(autoflush=False, autocommit=False, bind=engine, class_=AsyncSession)
@@ -15,7 +15,6 @@ SessionLocal = async_sessionmaker(autoflush=False, autocommit=False, bind=engine
 ## Base 
 
 Base = declarative_base()
-
 
 ## Bouncer to open the door
 
