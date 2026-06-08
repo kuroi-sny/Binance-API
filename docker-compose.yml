@@ -7,8 +7,9 @@ services:
     env_file:
       - .env 
     ports:
-     - "5432:5432"
-
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 # Container 2: FastAPI application
   web:
@@ -19,3 +20,7 @@ services:
       - "8000:8000"
     depends_on:
       - db
+
+# Declare the volume at the very bottom
+volumes:
+  postgres_data:

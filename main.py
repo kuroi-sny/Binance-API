@@ -10,6 +10,7 @@ from sqlalchemy.future import select
 from fastapi import WebSocket
 import websockets 
 import json
+import os
 
 
 
@@ -22,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = "Super_super_secret_key"
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256" 
 
 
