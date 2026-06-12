@@ -12,16 +12,19 @@ import websockets
 import json
 import os
 from worker import execute_trade_strategy
-
-
-
-## client = Client() ## Async needs this inside the functions its being used it
-
-## AUTH tools for jwt 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi import Request
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta, timezone
 
+
+## initializing Rate-limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter ## attach it to the app 
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -203,7 +206,9 @@ async def live(websocket: WebSocket, crypto:str ):
 
 
 @app.post("/trade/{crypto}")
-async def trigger_trade(crypto: str, current_user: str = Depends(get_current_user)):
+@limiter.limit("5/minute") ## Rate limiting decorator
+async def trigger_trade(request: Requests, crypto: str, current_user: str = Depends(get_current_user)): 
+## request: Requests because slowapi needs needs the object to look at IP add fo the usr calling the api
 
     # 1) send ticket to redis mailbox using .delay
     ## .delay tells it to run in the backrgound (celery)
