@@ -19,6 +19,8 @@ from fastapi import Request
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta, timezone
+import sys
+from loguru import logger
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -31,6 +33,12 @@ app = FastAPI()
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter ## attach it to the app 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+## remove the default messy test logger
+logger.remove()
+
+## add a clean production grade JSON logger that outputs to the console
+logger.add(sys.stdout, serialize=True)
 
 @app.post("/signup")
 async def create_user(request:schemas.UserCreate, db: AsyncSession = Depends(get_db)):
@@ -130,6 +138,7 @@ async def crypto_symbol(crypto: str, current_user: str = Depends(get_current_use
         }
     
     except BinanceAPIException:
+        logger.info("Trade triggered", extra={"symbol": crypto, "reason": "Invalid Symbol"})
         raise HTTPException(status_code=404, detail=f"{crypto} doesnt not exist on Binance")
     
     finally: await client.close_connection()  ## await Async connection close
@@ -190,13 +199,14 @@ async def get_history(crypto:str, current_user:str = Depends(get_current_user)):
 
 ## Websocket Part of it, starts from here :
 @app.websocket("/ws/live/{crypto}")
-async def live(websocket: WebSocket, crypto:str ):
+async def live(websocket: WebSocket, crypto:str):
 
     websocket_url = f"wss://stream.binance.com:9443/ws/{crypto}@trade"
 
     await websocket.accept()
     async with websockets.connect(websocket_url) as tunnel:
-        print("Tunnel opened, waiting for live trades: ")
+        
+        ## logger.info("Tunnel for symbol's LIVE price triggered", extra={"crypto_symbol": crypto, "user": current_user})
 
 
         async for message in tunnel: 
@@ -208,15 +218,17 @@ async def live(websocket: WebSocket, crypto:str ):
 @limiter.limit("5/minute") ## Rate limiting decorator
 async def trigger_trade(request: Request, crypto: str, current_user: str = Depends(get_current_user)): 
 ## request: Requests because slowapi needs needs the object to look at IP add fo the usr calling the api
-
     # 1) send ticket to redis mailbox using .delay
     ## .delay tells it to run in the backrgound (celery)
     task = execute_trade_strategy.delay(crypto)
+
+    logger.info("Trade triggered", extra={"crypto_symbol": crypto, "user": current_user, "task_id":task.id})
 
     return{
         "message": f"Trade strategy for {crypto} has been send to the background worker",
         "task_id": task.id
     }
+    
   
 
 

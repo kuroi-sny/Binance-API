@@ -102,3 +102,4 @@ alembic==1.13.1
 python-dotenv
 psycopg2-binary
 slowapi
+loguru
