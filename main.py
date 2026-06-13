@@ -213,7 +213,6 @@ async def live(websocket: WebSocket, crypto:str):
             await websocket.send_text(message)
 
 
-
 @app.post("/trade/{crypto}")
 @limiter.limit("5/minute") ## Rate limiting decorator
 async def trigger_trade(request: Request, crypto: str, current_user: str = Depends(get_current_user)): 

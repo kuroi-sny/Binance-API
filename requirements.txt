@@ -103,3 +103,6 @@ python-dotenv
 psycopg2-binary
 slowapi
 loguru
+pytest
+pytest-asyncio
+httpx
