@@ -1,0 +1,38 @@
+name: Backend CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Create Fake .env for Testing
+      run: |
+        echo "DATABASE_URL=postgresql+asyncpg://admin:password@db:5432/trading_db" >> .env
+        echo "POSTGRES_USER=admin" >> .env
+        echo "POSTGRES_PASSWORD=password" >> .env
+        echo "POSTGRES_DB=trading_db" >> .env
+        echo "JWT_SECRET_KEY=supersecret" >> .env
+        echo "JWT_ALGORITHM=HS256" >> .env
+        echo "BINANCE_TESTNET_API_KEY=dummy_key" >> .env
+        echo "BINANCE_TESTNET_SECRET_KEY=dummy_secret" >> .env
+
+    - name: Build and Start Docker Containers
+      run: docker compose up -d --build
+
+    - name: Wait for Database to Initialize
+      run: sleep 10
+
+    - name: Run Database Migrations
+      run: docker compose exec -T web alembic upgrade head
+
+    - name: Run Pytest Suite
+      run: docker compose exec -T web pytest
