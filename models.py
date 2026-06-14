@@ -23,7 +23,7 @@ class TradeAnalysis(Base):
     symbol = Column(String, index=True)
     sentiment = Column(String)
     reasoning = Column(String)
-    embedding = Column(Vector(768))
-    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    embedding = Column(Vector(3072))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     

@@ -1,10 +1,17 @@
 ## here's celery (background runner) boilerplate
 import os 
+import asyncio
 from dotenv import load_dotenv
 from celery import Celery
 from binance.client import Client
+from google import genai
+from database import SessionLocal
+import models
+from google.genai import types
 
 load_dotenv()
+
+ai_client = genai.Client()
 
 ## import keys from .env
 api_key = os.getenv("BINANCE_TESTNET_API_KEY")
@@ -21,37 +28,59 @@ celery_app = Celery(__name__, broker=redis_url, backend=redis_url)
 @celery_app.task
 def execute_trade_strategy(crypto_symbol: str):
     
-    client = Client(api_key, api_secret, testnet=True) ## no Async functionality becaues celery is strictly synchronous
+    binance_client = Client(api_key, api_secret, testnet=True) ## no Async functionality becaues celery is strictly synchronous
 
     lookback = 10
         ## klines is where we get our binance past data from
-    past_data_1D = client.get_klines(symbol=crypto_symbol, interval=Client.KLINE_INTERVAL_1DAY, limit=lookback)
+    past_data_1D = binance_client.get_klines(symbol=crypto_symbol, interval=Client.KLINE_INTERVAL_1DAY, limit=lookback)
         
     closing_prince_history = [] 
 
         ## in binance index = 4 (DAY[4]) is always the closing price
     for daily in (past_data_1D):
-            closing_prince_history.append(float(daily[4]))
+            closing_prince_history.append(float(daily[4]))    
         
-        ## SMA's based on Daily close
+     ## SMA's based on Daily 
     SMA10 = sum(closing_prince_history)/10
     SMA5 = sum(closing_prince_history[-5:])/5
 
+    prompt = f"""
+Analyze this cryptocurrency ({crypto_symbol}). 
+The recent 10-day closing prices are: {closing_prince_history}. 
+The 5-day SMA is {SMA5} and the 10-day SMA is {SMA10}. 
+Given these quantitative indicators, output a strict trading sentiment (BULLISH, BEARISH, or NEUTRAL) followed by a one-sentence reasoning.
+"""
+    
+    ai_response = ai_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
 
-        ## SMA trade signals
-    if SMA5 > SMA10:
-            Signal = "BUY"
-            order = client.order_market_buy(symbol=crypto_symbol, quantity=0.1)
+    ## convert ai_response into text
+    ai_text = ai_response.text 
 
-    elif SMA5 < SMA10:
-            Signal = "SELL"
-            order = client.order_market_sell(symbol=crypto_symbol, quantity=0.1)
+    ## embedding content
+    embedding_response = ai_client.models.embed_content(model="gemini-embedding-001", contents=ai_text)
 
-    else: 
-            Signal = None
-    print(f"[{crypto_symbol}] Signal Generated: {Signal}")
+    # We access index [0] because we only sent one piece of text to be embedded
+    vector = embedding_response.embeddings[0].values
+ 
 
-    return(f"{crypto_symbol} Successfully executed at trade for {Signal}") 
+
+ ###---------------------------------####
+
+    async def save_to_db():
+        async with SessionLocal() as db:
+            new_analysis = models.TradeAnalysis(
+                user_id=1,
+                symbol=crypto_symbol,
+                sentiment="PENDING",
+                reasoning=ai_text,
+                embedding=vector
+            )
+            db.add(new_analysis)
+            await db.commit()
+
+    asyncio.run(save_to_db())
+
+
     
 
     
